@@ -1,18 +1,24 @@
-// Prisma 7 Client Setup
-// The database connection URL is configured in prisma.config.ts
-// PrismaClient needs adapter or accelerateUrl in Prisma 7
-// This file will be updated when database is configured
+// Prisma Client Setup
+// After DB is provisioned, pass the connection config to PrismaClient constructor.
+// Prisma 7: url moved from schema to runtime config (adapter or accelerateUrl).
 
 import { PrismaClient } from "@prisma/client";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const globalForPrisma = globalThis as unknown as {
-  prisma: InstanceType<typeof PrismaClient> | undefined;
+  prisma: PrismaClient | undefined;
 };
 
-// Note: In production, configure PrismaClient with proper adapter
-// For now, this is a scaffold — actual DB connection setup will be added
-// when the PostgreSQL database is provisioned
-export const prisma = globalForPrisma.prisma ?? null;
+export const prisma: PrismaClient =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log:
+      process.env.NODE_ENV === "development"
+        ? ["query", "error", "warn"]
+        : ["error"],
+  });
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
+}
 
 export { PrismaClient };
