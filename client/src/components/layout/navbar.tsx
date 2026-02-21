@@ -1,0 +1,133 @@
+import { useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { Menu } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Separator } from "@/components/ui/separator";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { HudumaHubLogo } from "@/components/layout/logo";
+import { toast } from "sonner";
+
+const navLinks = [
+  { label: "Services", href: "/" },
+  { label: "About", href: "/" },
+  { label: "How It Works", href: "/" },
+];
+
+export function Navbar() {
+  const [open, setOpen] = useState(false);
+
+  const handleLoginClick = () => {
+    toast.info("Login feature coming soon!", {
+      description: "We're working on authentication.",
+    });
+  };
+
+  const handleGetStarted = () => {
+    toast.success("Welcome to HudumaHub!", {
+      description: "Let's get you started with Kenyan government services.",
+    });
+  };
+
+  return (
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        {/* Logo */}
+        <Link to="/" className="flex items-center gap-2">
+          <HudumaHubLogo size={32} />
+        </Link>
+
+        {/* Desktop Navigation */}
+        <nav
+          className="hidden md:flex items-center gap-8"
+          aria-label="Main navigation"
+        >
+          {navLinks.map((link) => (
+            <Link
+              key={link.label}
+              to={link.href}
+              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+
+        {/* Desktop Actions */}
+        <div className="hidden md:flex items-center gap-3">
+          <ThemeToggle />
+          <Button variant="outline" size="sm" onClick={handleLoginClick}>
+            Login
+          </Button>
+          <Button size="sm" onClick={handleGetStarted}>
+            Get Started
+          </Button>
+        </div>
+
+        {/* Mobile Menu */}
+        <div className="flex md:hidden items-center gap-2">
+          <ThemeToggle />
+          <Sheet open={open} onOpenChange={setOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="Open menu">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[300px] sm:w-[360px]">
+              <SheetHeader>
+                <SheetTitle>
+                  <HudumaHubLogo size={28} />
+                </SheetTitle>
+              </SheetHeader>
+              <div className="flex flex-col gap-4 mt-6">
+                <nav
+                  className="flex flex-col gap-3"
+                  aria-label="Mobile navigation"
+                >
+                  {navLinks.map((link) => (
+                    <Link
+                      key={link.label}
+                      to={link.href}
+                      onClick={() => setOpen(false)}
+                      className="text-base font-medium text-foreground py-2 px-3 rounded-md hover:bg-muted transition-colors"
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </nav>
+                <Separator />
+                <div className="flex flex-col gap-3 px-3">
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      handleLoginClick();
+                      setOpen(false);
+                    }}
+                  >
+                    Login
+                  </Button>
+                  <Button
+                    className="w-full"
+                    onClick={() => {
+                      handleGetStarted();
+                      setOpen(false);
+                    }}
+                  >
+                    Get Started
+                  </Button>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
+      </div>
+    </header>
+  );
+}

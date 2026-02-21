@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+client/dist/
+server/dist/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Testing
+coverage/
+
+# PWA dev artifacts
+dev-dist/
+
+# Prisma
+server/prisma/migrations/
+
+# TypeScript
+*.tsbuildinfo
+
+# Misc
+*.pem
+.turbo/
