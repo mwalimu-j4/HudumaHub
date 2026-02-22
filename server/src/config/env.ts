@@ -11,6 +11,13 @@ const envSchema = z.object({
   DATABASE_URL: z.string().default("postgresql://localhost:5432/hudumahub"),
   JWT_SECRET: z.string().default("hudumahub-dev-secret-change-in-production"),
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
+
+  // Ollama AI config
+  OLLAMA_BASE_URL: z.string().default("http://localhost:11434"),
+  OLLAMA_MODEL: z.string().default("llama3.2"),
+  AI_MAX_TOKENS: z.coerce.number().default(2048),
+  AI_RATE_LIMIT_MAX: z.coerce.number().default(20),
+  AI_RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60000),
 });
 
 const parsed = envSchema.safeParse(process.env);

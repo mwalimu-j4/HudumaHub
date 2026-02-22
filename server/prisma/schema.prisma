@@ -7,10 +7,10 @@ datasource db {
 }
 
 // =============================================
-// HudumaHub Schema — Scaffold
-// Add models as features are implemented
+// HudumaHub Schema — Production Civic Platform
 // =============================================
 
+// ----- Users -----
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -20,10 +20,52 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  conversations Conversation[]
+
   @@map("users")
 }
 
 enum Role {
   CITIZEN
   ADMIN
+}
+
+// ----- AI Conversations -----
+model Conversation {
+  id        String    @id @default(cuid())
+  title     String    @default("New Conversation")
+  userId    String?   @map("user_id")
+  sessionId String    @map("session_id")
+  model     String    @default("llama3.2")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  messages Message[]
+
+  @@index([userId])
+  @@index([sessionId])
+  @@map("conversations")
+}
+
+// ----- AI Messages -----
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String   @map("conversation_id")
+  role           MessageRole
+  content        String
+  tokenCount     Int?     @map("token_count")
+  durationMs     Int?     @map("duration_ms")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@map("messages")
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
 }
