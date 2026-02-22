@@ -12,9 +12,10 @@ const envSchema = z.object({
   JWT_SECRET: z.string().default("hudumahub-dev-secret-change-in-production"),
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
 
-  // Ollama AI config
-  OLLAMA_BASE_URL: z.string().default("http://localhost:11434"),
-  OLLAMA_MODEL: z.string().default("llama3.2"),
+  // Cloud AI Provider config (OpenAI-compatible: Groq, OpenAI, Together, etc.)
+  AI_API_KEY: z.string().default(""),
+  AI_PROVIDER_URL: z.string().default("https://api.groq.com/openai/v1"),
+  AI_MODEL: z.string().default("llama-3.3-70b-versatile"),
   AI_MAX_TOKENS: z.coerce.number().default(2048),
   AI_RATE_LIMIT_MAX: z.coerce.number().default(20),
   AI_RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60000),

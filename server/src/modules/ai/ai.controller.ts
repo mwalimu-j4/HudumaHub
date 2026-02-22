@@ -16,7 +16,7 @@ import {
   listConversations,
   deleteConversation,
 } from "./ai.service.js";
-import { checkOllamaHealth } from "../../lib/ollama.js";
+import { checkAIHealth } from "../../lib/ai-client.js";
 import type { AppError } from "../../middlewares/error.js";
 
 /**
@@ -42,15 +42,17 @@ export async function chatHandler(
     const input = parsed.data;
 
     if (input.stream) {
-      // SSE Streaming response
+      // Prepare DB & stream generator BEFORE sending SSE headers
+      // so that DB errors return a proper HTTP error.
+      const { conversationId, stream } = await handleChatStream(input);
+
+      // Now switch to SSE mode
       res.writeHead(200, {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
         "X-Accel-Buffering": "no",
       });
-
-      const { conversationId, stream } = await handleChatStream(input);
 
       // Send conversation ID first
       res.write(
@@ -65,7 +67,7 @@ export async function chatHandler(
         fullContent += chunk.content;
 
         if (chunk.totalDuration) {
-          lastDuration = Math.round(chunk.totalDuration / 1_000_000);
+          lastDuration = chunk.totalDuration; // already in ms from ai-client
         }
         if (chunk.evalCount) {
           lastTokenCount = chunk.evalCount;
@@ -110,10 +112,13 @@ export async function chatHandler(
       });
     }
   } catch (err) {
-    // If headers already sent (streaming failed mid-way), end the response
+    // If headers already sent (streaming failed mid-way), send SSE error
     if (res.headersSent) {
+      const errorMsg =
+        err instanceof Error ? err.message : "Stream interrupted";
+      console.error("❌ AI stream error:", errorMsg);
       res.write(
-        `data: ${JSON.stringify({ type: "error", error: "Stream interrupted" })}\n\n`,
+        `data: ${JSON.stringify({ type: "error", error: errorMsg })}\n\n`,
       );
       res.end();
       return;
@@ -221,7 +226,7 @@ export async function deleteConversationHandler(
 
 /**
  * GET /api/ai/health
- * Check Ollama status.
+ * Check AI provider status.
  */
 export async function aiHealthHandler(
   _req: Request,
@@ -229,7 +234,7 @@ export async function aiHealthHandler(
   next: NextFunction,
 ) {
   try {
-    const health = await checkOllamaHealth();
+    const health = await checkAIHealth();
     res.status(health.online ? 200 : 503).json({
       success: health.online,
       data: health,

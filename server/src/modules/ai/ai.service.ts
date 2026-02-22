@@ -2,7 +2,7 @@
 // Handles conversation persistence and Ollama interaction
 
 import { prisma } from "../../prisma/client.js";
-import { streamChat, chat, type ChatMessage } from "../../lib/ollama.js";
+import { streamChat, chat, type ChatMessage } from "../../lib/ai-client.js";
 import { buildSystemMessages } from "./ai.prompt.js";
 import type { SendMessageInput } from "./ai.validation.js";
 
@@ -43,8 +43,8 @@ export async function handleChatStream(input: SendMessageInput) {
     select: { role: true, content: true },
   });
 
-  // Build messages array for Ollama
-  const ollamaMessages: ChatMessage[] = buildSystemMessages(
+  // Build messages array for AI provider
+  const aiMessages: ChatMessage[] = buildSystemMessages(
     history.map((m) => ({
       role: m.role.toLowerCase() as "user" | "assistant",
       content: m.content,
@@ -52,7 +52,7 @@ export async function handleChatStream(input: SendMessageInput) {
   );
 
   // Stream response
-  const stream = streamChat(ollamaMessages, model);
+  const stream = streamChat(aiMessages, model);
 
   return { conversationId: convoId, stream };
 }
@@ -93,14 +93,14 @@ export async function handleChatComplete(input: SendMessageInput) {
     select: { role: true, content: true },
   });
 
-  const ollamaMessages: ChatMessage[] = buildSystemMessages(
+  const aiMessages: ChatMessage[] = buildSystemMessages(
     history.map((m) => ({
       role: m.role.toLowerCase() as "user" | "assistant",
       content: m.content,
     })),
   );
 
-  const result = await chat(ollamaMessages, model);
+  const result = await chat(aiMessages, model);
 
   // Save assistant response
   const assistantMessage = await prisma.message.create({
@@ -108,9 +108,7 @@ export async function handleChatComplete(input: SendMessageInput) {
       conversationId: convoId,
       role: "ASSISTANT",
       content: result.content,
-      durationMs: result.totalDuration
-        ? Math.round(result.totalDuration / 1_000_000)
-        : undefined,
+      durationMs: result.totalDuration, // already ms from ai-client
       tokenCount: result.evalCount,
     },
   });

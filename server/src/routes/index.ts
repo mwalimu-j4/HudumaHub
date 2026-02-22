@@ -25,8 +25,8 @@ router.get("/", (_req: Request, res: Response) => {
   });
 });
 
-// AI module routes — with dedicated rate limiter on chat
-router.use("/ai", aiRouter);
+// AI module routes — dedicated rate limiter on chat BEFORE the router
 router.use("/ai/chat", aiRateLimiter);
+router.use("/ai", aiRouter);
 
 export default router;
