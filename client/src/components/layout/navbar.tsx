@@ -16,6 +16,7 @@ import { toast } from "sonner";
 
 const navLinks = [
   { label: "Services", href: "/" },
+  { label: "AI Assistant", href: "/chat" },
   { label: "About", href: "/" },
   { label: "How It Works", href: "/" },
 ];

@@ -1,13 +1,13 @@
 import { SendHorizonal } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 export function HeroSection() {
+  const navigate = useNavigate();
+
   const handleStartAsking = () => {
-    toast.success("AI Chat coming soon!", {
-      description:
-        "Our smart assistant is being built to help you navigate government services.",
-    });
+    void navigate({ to: "/chat" });
   };
 
   const handleBrowseServices = () => {

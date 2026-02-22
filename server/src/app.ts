@@ -11,10 +11,18 @@ const app: Express = express();
 // Security middleware
 app.use(helmet());
 
-// CORS
+// CORS — support comma-separated origins for production
+const allowedOrigins = env.CORS_ORIGIN.split(",").map((o) => o.trim());
 app.use(
   cors({
-    origin: env.CORS_ORIGIN,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   }),
 );
