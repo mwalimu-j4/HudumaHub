@@ -1,3 +1,4 @@
+import { useState, type KeyboardEvent } from "react";
 import { SendHorizonal } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
@@ -5,9 +6,22 @@ import { toast } from "sonner";
 
 export function HeroSection() {
   const navigate = useNavigate();
+  const [query, setQuery] = useState("");
 
   const handleStartAsking = () => {
-    void navigate({ to: "/chat" });
+    const trimmed = query.trim();
+    if (trimmed) {
+      void navigate({ to: "/chat", search: { q: trimmed } });
+    } else {
+      void navigate({ to: "/chat" });
+    }
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleStartAsking();
+    }
   };
 
   const handleBrowseServices = () => {
@@ -42,15 +56,17 @@ export function HeroSection() {
             No more confusing government websites or long queues.
           </p>
 
-          {/* Fake chat input */}
+          {/* Chat input — typeable, navigates to /chat with query */}
           <div className="mt-8 sm:mt-10 mx-auto max-w-xl">
             <div className="relative flex items-center rounded-xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md focus-within:shadow-md focus-within:ring-2 focus-within:ring-ring/20">
               <input
                 type="text"
-                readOnly
-                placeholder="I lost my ID, what should I do?"
-                className="flex-1 bg-transparent py-4 px-5 text-sm sm:text-base text-foreground placeholder:text-muted-foreground outline-none cursor-text"
-                aria-label="Example service query"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask anything... e.g. How do I get a National ID?"
+                className="flex-1 bg-transparent py-4 px-5 text-sm sm:text-base text-foreground placeholder:text-muted-foreground outline-none"
+                aria-label="Ask about Kenyan government services"
               />
               <button
                 className="mr-3 flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"

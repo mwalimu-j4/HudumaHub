@@ -9,11 +9,9 @@ import type {
   AIHealthStatus,
 } from "./types";
 
+// Default to production Render URL. Override locally via VITE_API_URL in .env
 const API_BASE =
-  import.meta.env.VITE_API_URL ??
-  (import.meta.env.PROD
-    ? "https://huduma-jqiq.onrender.com/api"
-    : "http://localhost:5000/api");
+  import.meta.env.VITE_API_URL || "https://huduma-jqiq.onrender.com/api";
 
 /**
  * Stream a chat message via SSE.

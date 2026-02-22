@@ -9,9 +9,11 @@ const ChatContainer = lazy(() =>
   })),
 );
 
+type ChatSearch = { q?: string };
+
 function ChatPageFallback() {
   return (
-    <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
+    <div className="flex flex-1 items-center justify-center">
       <div className="flex flex-col items-center gap-3">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         <p className="text-sm text-muted-foreground">Loading AI Assistant...</p>
@@ -21,14 +23,18 @@ function ChatPageFallback() {
 }
 
 export const Route = createFileRoute("/chat")({
+  validateSearch: (search: Record<string, unknown>): ChatSearch => ({
+    q: typeof search.q === "string" ? search.q : undefined,
+  }),
   component: ChatPage,
 });
 
 function ChatPage() {
+  const { q } = Route.useSearch();
   return (
-    <div className="h-[calc(100vh-4rem)]">
+    <div className="flex flex-1 flex-col overflow-hidden">
       <Suspense fallback={<ChatPageFallback />}>
-        <ChatContainer />
+        <ChatContainer initialQuery={q} />
       </Suspense>
     </div>
   );
