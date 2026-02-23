@@ -45,9 +45,9 @@ export function ChatContainer({
   };
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex h-full flex-1 flex-col">
       {/* Chat Header */}
-      <div className="flex items-center justify-between border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
+      <div className="shrink-0 flex items-center justify-between border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
             <Bot className="h-4 w-4 text-primary" />
@@ -75,7 +75,7 @@ export function ChatContainer({
       {/* Messages Area — scrollable */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto overscroll-contain"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain scroll-smooth"
       >
         {messages.length === 0 ? (
           <EmptyChat onSelectPrompt={handleSelectPrompt} />
@@ -88,12 +88,14 @@ export function ChatContainer({
         )}
       </div>
 
-      {/* Input Area — sticky at bottom */}
-      <ChatInput
-        onSend={sendMessage}
-        onStop={stopGenerating}
-        isLoading={isLoading}
-      />
+      {/* Input Area — pinned at bottom */}
+      <div className="shrink-0">
+        <ChatInput
+          onSend={sendMessage}
+          onStop={stopGenerating}
+          isLoading={isLoading}
+        />
+      </div>
     </div>
   );
 }

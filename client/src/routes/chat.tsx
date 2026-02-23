@@ -32,7 +32,7 @@ export const Route = createFileRoute("/chat")({
 function ChatPage() {
   const { q } = Route.useSearch();
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col">
       <Suspense fallback={<ChatPageFallback />}>
         <ChatContainer initialQuery={q} />
       </Suspense>

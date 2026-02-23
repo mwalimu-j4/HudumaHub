@@ -12,16 +12,20 @@ datasource db {
 
 // ----- Users -----
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  password  String
-  role      Role     @default(CITIZEN)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id         String   @id @default(cuid())
+  email      String   @unique
+  name       String?
+  image      String?
+  provider   String   @default("google")
+  providerId String   @map("provider_id")
+  isActive   Boolean  @default(true) @map("is_active")
+  role       Role     @default(CITIZEN)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   conversations Conversation[]
 
+  @@index([providerId])
   @@map("users")
 }
 
@@ -68,4 +72,14 @@ enum MessageRole {
   USER
   ASSISTANT
   SYSTEM
+}
+
+// ----- Sessions (connect-pg-simple) -----
+model Session {
+  sid     String   @id @db.VarChar(255)
+  sess    Json
+  expire  DateTime @db.Timestamptz(6)
+
+  @@index([expire], map: "IDX_session_expire")
+  @@map("session")
 }

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import type { IRouter } from "express";
 import { aiRouter } from "../modules/ai/index.js";
+import { authRouter } from "../modules/auth/index.js";
 import { aiRateLimiter, apiRateLimiter } from "../middlewares/rate-limit.js";
 
 const router: IRouter = Router();
@@ -24,6 +25,9 @@ router.get("/", (_req: Request, res: Response) => {
     docs: "/api/health",
   });
 });
+
+// Auth routes
+router.use("/auth", authRouter);
 
 // AI module routes — dedicated rate limiter on chat BEFORE the router
 router.use("/ai/chat", aiRateLimiter);

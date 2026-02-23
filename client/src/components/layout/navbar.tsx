@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +12,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { HudumaHubLogo } from "@/components/layout/logo";
-import { toast } from "sonner";
+import { useAuth, UserMenu } from "@/features/auth";
 
 const navLinks = [
   { label: "Services", href: "/" },
@@ -23,17 +23,15 @@ const navLinks = [
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
+  const { isAuthenticated, login } = useAuth();
+  const navigate = useNavigate();
 
   const handleLoginClick = () => {
-    toast.info("Login feature coming soon!", {
-      description: "We're working on authentication.",
-    });
+    login();
   };
 
   const handleGetStarted = () => {
-    toast.success("Welcome to HudumaHub!", {
-      description: "Let's get you started with Kenyan government services.",
-    });
+    void navigate({ to: "/login" });
   };
 
   return (
@@ -63,12 +61,18 @@ export function Navbar() {
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-3">
           <ThemeToggle />
-          <Button variant="outline" size="sm" onClick={handleLoginClick}>
-            Login
-          </Button>
-          <Button size="sm" onClick={handleGetStarted}>
-            Get Started
-          </Button>
+          {isAuthenticated ? (
+            <UserMenu />
+          ) : (
+            <>
+              <Button variant="outline" size="sm" onClick={handleLoginClick}>
+                Login
+              </Button>
+              <Button size="sm" onClick={handleGetStarted}>
+                Get Started
+              </Button>
+            </>
+          )}
         </div>
 
         {/* Mobile Menu */}
@@ -104,25 +108,39 @@ export function Navbar() {
                 </nav>
                 <Separator />
                 <div className="flex flex-col gap-3 px-3">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      handleLoginClick();
-                      setOpen(false);
-                    }}
-                  >
-                    Login
-                  </Button>
-                  <Button
-                    className="w-full"
-                    onClick={() => {
-                      handleGetStarted();
-                      setOpen(false);
-                    }}
-                  >
-                    Get Started
-                  </Button>
+                  {isAuthenticated ? (
+                    <Button
+                      className="w-full"
+                      onClick={() => {
+                        void navigate({ to: "/dashboard" });
+                        setOpen(false);
+                      }}
+                    >
+                      Dashboard
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => {
+                          handleLoginClick();
+                          setOpen(false);
+                        }}
+                      >
+                        Login
+                      </Button>
+                      <Button
+                        className="w-full"
+                        onClick={() => {
+                          handleGetStarted();
+                          setOpen(false);
+                        }}
+                      >
+                        Get Started
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
             </SheetContent>

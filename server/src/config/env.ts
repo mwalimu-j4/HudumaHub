@@ -11,6 +11,17 @@ const envSchema = z.object({
   DATABASE_URL: z.string().default("postgresql://localhost:5432/hudumahub"),
   JWT_SECRET: z.string().default("hudumahub-dev-secret-change-in-production"),
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
+  CLIENT_URL: z.string().default("http://localhost:5173"),
+
+  // Session
+  SESSION_SECRET: z.string().default("hudumahub-session-secret-change-in-prod"),
+
+  // Google OAuth
+  GOOGLE_CLIENT_ID: z.string().default(""),
+  GOOGLE_CLIENT_SECRET: z.string().default(""),
+  GOOGLE_CALLBACK_URL: z
+    .string()
+    .default("http://localhost:5000/api/auth/google/callback"),
 
   // Cloud AI Provider config (OpenAI-compatible: Groq, OpenAI, Together, etc.)
   AI_API_KEY: z.string().default(""),
