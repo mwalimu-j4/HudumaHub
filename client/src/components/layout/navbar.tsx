@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useMatch, useNavigate } from "@tanstack/react-router";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +25,7 @@ export function Navbar() {
   const [open, setOpen] = useState(false);
   const { isAuthenticated, login } = useAuth();
   const navigate = useNavigate();
+  const isLandingPage = useMatch({ from: "/", shouldThrow: false });
 
   const handleLoginClick = () => {
     login();
@@ -35,7 +36,13 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header
+      className={`sticky top-0 z-50 w-full transition-colors duration-300 ${
+        isLandingPage
+          ? "border-b border-white/10 bg-transparent backdrop-blur-sm"
+          : "border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+      }`}
+    >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2">
@@ -51,7 +58,11 @@ export function Navbar() {
             <Link
               key={link.label}
               to={link.href}
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className={`text-sm font-medium transition-colors ${
+                isLandingPage
+                  ? "text-white/70 hover:text-white"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
             >
               {link.label}
             </Link>
@@ -65,10 +76,27 @@ export function Navbar() {
             <UserMenu />
           ) : (
             <>
-              <Button variant="outline" size="sm" onClick={handleLoginClick}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLoginClick}
+                className={
+                  isLandingPage
+                    ? "border-white/20 text-white bg-white/5 hover:bg-white/10 hover:text-white"
+                    : ""
+                }
+              >
                 Login
               </Button>
-              <Button size="sm" onClick={handleGetStarted}>
+              <Button
+                size="sm"
+                onClick={handleGetStarted}
+                className={
+                  isLandingPage
+                    ? "bg-green-600 hover:bg-green-500 text-white"
+                    : ""
+                }
+              >
                 Get Started
               </Button>
             </>
