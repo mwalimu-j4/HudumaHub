@@ -6,6 +6,67 @@ import { streamChat, chat, type ChatMessage } from "../../lib/ai-client.js";
 import { buildSystemMessages } from "./ai.prompt.js";
 import type { SendMessageInput } from "./ai.validation.js";
 
+/** Max character length for AI responses */
+const MAX_RESPONSE_LENGTH = 800;
+
+/** Phrases that should never appear in a government assistant response */
+const FORBIDDEN_PHRASES = [
+  "let me know",
+  "feel free",
+  "i will guide you",
+  "i'll guide you",
+  "don't worry",
+  "no worries",
+  "great question",
+  "good question",
+  "sure!",
+  "of course!",
+  "absolutely!",
+  "i hope this helps",
+  "i understand how",
+  "happy to help",
+  "glad to help",
+  "oh no",
+  "that's a great",
+  "that sounds",
+];
+
+/**
+ * Sanitize AI response: trim length, strip forbidden filler phrases.
+ */
+function sanitizeResponse(text: string): string {
+  let cleaned = text;
+
+  // Remove forbidden conversational phrases (case-insensitive)
+  for (const phrase of FORBIDDEN_PHRASES) {
+    const regex = new RegExp(phrase, "gi");
+    cleaned = cleaned.replace(regex, "");
+  }
+
+  // Remove greeting lines at the start (e.g. "Hello!", "Hi there,")
+  cleaned = cleaned.replace(
+    /^(hello[!,.]?\s*|hi[!,.]?\s*|hey[!,.]?\s*|greetings[!,.]?\s*)/i,
+    "",
+  );
+
+  // Collapse multiple blank lines into one
+  cleaned = cleaned.replace(/\n{3,}/g, "\n\n");
+
+  // Trim whitespace
+  cleaned = cleaned.trim();
+
+  // Enforce max length — cut at last complete sentence/line within limit
+  if (cleaned.length > MAX_RESPONSE_LENGTH) {
+    const truncated = cleaned.slice(0, MAX_RESPONSE_LENGTH);
+    const lastNewline = truncated.lastIndexOf("\n");
+    const lastPeriod = truncated.lastIndexOf(".");
+    const cutPoint = Math.max(lastNewline, lastPeriod);
+    cleaned = cutPoint > 0 ? truncated.slice(0, cutPoint + 1).trim() : truncated.trim();
+  }
+
+  return cleaned;
+}
+
 /**
  * Get or create a conversation, then stream the AI response.
  * Returns an async generator for Server-Sent Events.
@@ -102,12 +163,15 @@ export async function handleChatComplete(input: SendMessageInput) {
 
   const result = await chat(aiMessages, model);
 
+  // Sanitize AI response before saving
+  const cleanedContent = sanitizeResponse(result.content);
+
   // Save assistant response
   const assistantMessage = await prisma.message.create({
     data: {
       conversationId: convoId,
       role: "ASSISTANT",
-      content: result.content,
+      content: cleanedContent,
       durationMs: result.totalDuration, // already ms from ai-client
       tokenCount: result.evalCount,
     },
@@ -118,14 +182,14 @@ export async function handleChatComplete(input: SendMessageInput) {
     message: {
       id: assistantMessage.id,
       role: "assistant" as const,
-      content: result.content,
+      content: cleanedContent,
       createdAt: assistantMessage.createdAt.toISOString(),
     },
   };
 }
 
 /**
- * Save the final streamed assistant message to DB.
+ * Save the final streamed assistant message to DB (sanitized).
  */
 export async function saveAssistantMessage(
   conversationId: string,
@@ -133,11 +197,12 @@ export async function saveAssistantMessage(
   durationMs?: number,
   tokenCount?: number,
 ) {
+  const cleanedContent = sanitizeResponse(content);
   return prisma.message.create({
     data: {
       conversationId,
       role: "ASSISTANT",
-      content,
+      content: cleanedContent,
       durationMs,
       tokenCount,
     },
