@@ -1,10 +1,13 @@
 import app from "./app";
 import { env } from "./config/env";
+import { dbReady } from "./lib/db-pool";
 
 const PORT = env.PORT;
 
-app.listen(PORT, () => {
-  console.log(`
+// Wait for split-schema initialization before accepting requests
+dbReady.then(() => {
+  app.listen(PORT, () => {
+    console.log(`
   ╔═══════════════════════════════════════╗
   ║          🏛️  HudumaHub API           ║
   ║                                       ║
@@ -12,5 +15,6 @@ app.listen(PORT, () => {
   ║  Health:  http://localhost:${PORT}/api/health ║
   ║  Mode:    ${env.NODE_ENV.padEnd(24)}║
   ╚═══════════════════════════════════════╝
-  `);
+    `);
+  });
 });

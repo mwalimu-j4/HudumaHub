@@ -12,6 +12,7 @@ import {
 import { useState, useCallback, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import type { ChatMessage as ChatMessageType, StructuredData } from "../types";
+import { LocationCard } from "./location-card";
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -157,6 +158,17 @@ export function ChatMessage({ message }: ChatMessageProps) {
     return getContentWithoutSteps(message.content);
   }, [message.content, structured]);
 
+  const showLocationCard = useMemo(() => {
+    if (isUser || isStreaming || !message.content) return false;
+    const lower = message.content.toLowerCase();
+    return (
+      /huduma\s*centre/i.test(lower) ||
+      /nearest\s*(office|centre|center|location)/i.test(lower) ||
+      /visit\s*(a|the|your|nearest)\s*(huduma|office)/i.test(lower) ||
+      /in\s*person/i.test(lower)
+    );
+  }, [message.content, isUser, isStreaming]);
+
   return (
     <div
       className={cn(
@@ -260,6 +272,9 @@ export function ChatMessage({ message }: ChatMessageProps) {
             </div>
           ) : null}
         </div>
+
+        {/* Location intelligence card */}
+        {showLocationCard && <LocationCard />}
 
         {/* Reaction row for assistant messages */}
         {!isUser && message.content && !isStreaming && (

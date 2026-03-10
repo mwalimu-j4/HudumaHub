@@ -16,9 +16,8 @@ import { useAuth, UserMenu } from "@/features/auth";
 
 const navLinks = [
   { label: "Services", href: "/" },
+  { label: "Find Centres", href: "/find-centres" },
   { label: "AI Assistant", href: "/chat" },
-  { label: "About", href: "/" },
-  { label: "How It Works", href: "/" },
 ];
 
 export function Navbar() {

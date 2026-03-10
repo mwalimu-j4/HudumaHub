@@ -11,11 +11,15 @@ export function Layout({ children }: LayoutProps) {
   const isChatPage = useMatch({ from: "/chat", shouldThrow: false });
   const isDashboard = useMatch({ from: "/dashboard", shouldThrow: false });
   const isLogin = useMatch({ from: "/login", shouldThrow: false });
-  const hideFooter = isChatPage || isDashboard || isLogin;
+  const isFindCentres = useMatch({
+    from: "/find-centres",
+    shouldThrow: false,
+  });
+  const hideFooter = isChatPage || isDashboard || isLogin || isFindCentres;
   const hideNavbar = !!isChatPage;
 
-  // Chat page needs a fixed viewport (no body scroll, internal scroll only)
-  const isFixedViewport = !!isChatPage;
+  // Chat and map pages need a fixed viewport (no body scroll, internal scroll only)
+  const isFixedViewport = !!isChatPage || !!isFindCentres;
 
   return (
     <div
