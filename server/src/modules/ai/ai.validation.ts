@@ -7,7 +7,7 @@ export const sendMessageSchema = z.object({
     .min(1, "Message cannot be empty")
     .max(4000, "Message must be under 4000 characters")
     .trim(),
-  conversationId: z.string().cuid().optional(),
+  conversationId: z.string().optional(),
   sessionId: z.string().uuid(),
   model: z.string().optional(),
   stream: z.boolean().default(true),
@@ -16,7 +16,7 @@ export const sendMessageSchema = z.object({
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
 
 export const getConversationSchema = z.object({
-  conversationId: z.string().cuid(),
+  conversationId: z.string(),
 });
 
 export const listConversationsSchema = z.object({
@@ -26,5 +26,5 @@ export const listConversationsSchema = z.object({
 });
 
 export const deleteConversationSchema = z.object({
-  conversationId: z.string().cuid(),
+  conversationId: z.string(),
 });

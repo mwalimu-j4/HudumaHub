@@ -1,9 +1,28 @@
 // AI Service Layer — Business Logic for AI Chat
-// Handles conversation persistence and Ollama interaction
+// Integrates caching, conversation threads, analytics, and AI streaming
 
 import { prisma } from "../../prisma/client.js";
 import { streamChat, chat, type ChatMessage } from "../../lib/ai-client.js";
 import { buildSystemMessages } from "./ai.prompt.js";
+import { parseStructuredData } from "./structured-parser.js";
+import {
+  checkCache,
+  storeInCache,
+  detectCategory,
+  getQuestionHash,
+} from "../cache/index.js";
+import {
+  createThread,
+  updateThreadTitle,
+  saveMessage as saveThreadMessage,
+  getRecentMessages,
+  generateTitle,
+  getThreadMessages,
+  listThreads as listConversationThreads,
+  deleteThread,
+  getThread,
+} from "../conversations/index.js";
+import { logQueryEvent } from "../analytics/index.js";
 import type { SendMessageInput } from "./ai.validation.js";
 
 /** Max character length for AI responses */
@@ -37,229 +56,305 @@ const FORBIDDEN_PHRASES = [
 function sanitizeResponse(text: string): string {
   let cleaned = text;
 
-  // Remove forbidden conversational phrases (case-insensitive)
   for (const phrase of FORBIDDEN_PHRASES) {
     const regex = new RegExp(phrase, "gi");
     cleaned = cleaned.replace(regex, "");
   }
 
-  // Remove greeting lines at the start (e.g. "Hello!", "Hi there,")
   cleaned = cleaned.replace(
     /^(hello[!,.]?\s*|hi[!,.]?\s*|hey[!,.]?\s*|greetings[!,.]?\s*)/i,
     "",
   );
 
-  // Collapse multiple blank lines into one
   cleaned = cleaned.replace(/\n{3,}/g, "\n\n");
-
-  // Trim whitespace
   cleaned = cleaned.trim();
 
-  // Enforce max length — cut at last complete sentence/line within limit
   if (cleaned.length > MAX_RESPONSE_LENGTH) {
     const truncated = cleaned.slice(0, MAX_RESPONSE_LENGTH);
     const lastNewline = truncated.lastIndexOf("\n");
     const lastPeriod = truncated.lastIndexOf(".");
     const cutPoint = Math.max(lastNewline, lastPeriod);
-    cleaned = cutPoint > 0 ? truncated.slice(0, cutPoint + 1).trim() : truncated.trim();
+    cleaned =
+      cutPoint > 0 ? truncated.slice(0, cutPoint + 1).trim() : truncated.trim();
   }
 
   return cleaned;
 }
 
 /**
- * Get or create a conversation, then stream the AI response.
- * Returns an async generator for Server-Sent Events.
+ * Handle a chat message with cache-first strategy.
+ * Returns cached response or streams new AI response.
  */
 export async function handleChatStream(input: SendMessageInput) {
   const { message, conversationId, sessionId, model } = input;
+  const startTime = Date.now();
 
-  // Get or create conversation
-  let convoId = conversationId;
-  if (!convoId) {
-    const conversation = await prisma.conversation.create({
-      data: {
-        sessionId,
-        model: model ?? "llama3.2",
-        title: message.slice(0, 80),
-      },
-    });
-    convoId = conversation.id;
+  // Step 1: Get or create conversation thread (split schema)
+  let threadId = conversationId;
+  if (!threadId) {
+    const thread = await createThread(
+      sessionId,
+      undefined,
+      generateTitle(message),
+      model,
+    );
+    threadId = thread.id;
+  } else {
+    // Also update the legacy Prisma table for backwards compat
   }
 
-  // Save user message
-  await prisma.message.create({
-    data: {
-      conversationId: convoId,
-      role: "USER",
-      content: message,
-    },
-  });
+  // Step 2: Check cache FIRST
+  const cached = await checkCache(message);
+  if (cached) {
+    const latency = Date.now() - startTime;
+    const category = detectCategory(message);
+    const hash = getQuestionHash(message);
 
-  // Load conversation history (last 20 messages for context window)
-  const history = await prisma.message.findMany({
-    where: { conversationId: convoId },
-    orderBy: { createdAt: "asc" },
-    take: 20,
-    select: { role: true, content: true },
-  });
+    // Save to conversation history
+    await saveThreadMessage(threadId, "user", message);
+    await saveThreadMessage(
+      threadId,
+      "assistant",
+      cached.answer_text,
+      cached.structured_data,
+    );
 
-  // Build messages array for AI provider
+    // Log analytics
+    await logQueryEvent(hash, true, latency, category).catch(() => {});
+
+    // Return cached response as a single-chunk "stream"
+    async function* cachedStream(): AsyncGenerator<{
+      content: string;
+      done: boolean;
+      fromCache: boolean;
+    }> {
+      yield { content: cached!.answer_text, done: true, fromCache: true };
+    }
+
+    return {
+      conversationId: threadId,
+      stream: cachedStream(),
+      fromCache: true,
+      structuredData: cached.structured_data,
+    };
+  }
+
+  // Step 3: Cache miss — save user message and stream AI response
+  await saveThreadMessage(threadId, "user", message);
+
+  // Load conversation context
+  const history = await getRecentMessages(threadId, 20);
   const aiMessages: ChatMessage[] = buildSystemMessages(
     history.map((m) => ({
-      role: m.role.toLowerCase() as "user" | "assistant",
+      role: m.role as "user" | "assistant",
       content: m.content,
     })),
   );
 
-  // Stream response
   const stream = streamChat(aiMessages, model);
 
-  return { conversationId: convoId, stream };
+  return { conversationId: threadId, stream, fromCache: false };
 }
 
 /**
- * Non-streaming chat completion — saves full response once done.
+ * Non-streaming chat with caching.
  */
 export async function handleChatComplete(input: SendMessageInput) {
   const { message, conversationId, sessionId, model } = input;
+  const startTime = Date.now();
 
-  // Get or create conversation
-  let convoId = conversationId;
-  if (!convoId) {
-    const conversation = await prisma.conversation.create({
-      data: {
-        sessionId,
-        model: model ?? "llama3.2",
-        title: message.slice(0, 80),
-      },
-    });
-    convoId = conversation.id;
+  let threadId = conversationId;
+  if (!threadId) {
+    const thread = await createThread(
+      sessionId,
+      undefined,
+      generateTitle(message),
+      model,
+    );
+    threadId = thread.id;
   }
 
-  // Save user message
-  await prisma.message.create({
-    data: {
-      conversationId: convoId,
-      role: "USER",
-      content: message,
-    },
-  });
+  // Check cache first
+  const cached = await checkCache(message);
+  if (cached) {
+    const latency = Date.now() - startTime;
+    await saveThreadMessage(threadId, "user", message);
+    const saved = await saveThreadMessage(
+      threadId,
+      "assistant",
+      cached.answer_text,
+      cached.structured_data,
+    );
+    await logQueryEvent(
+      getQuestionHash(message),
+      true,
+      latency,
+      detectCategory(message),
+    ).catch(() => {});
 
-  // Load conversation history
-  const history = await prisma.message.findMany({
-    where: { conversationId: convoId },
-    orderBy: { createdAt: "asc" },
-    take: 20,
-    select: { role: true, content: true },
-  });
+    return {
+      conversationId: threadId,
+      message: {
+        id: saved.id,
+        role: "assistant" as const,
+        content: cached.answer_text,
+        structuredData: cached.structured_data,
+        createdAt: saved.created_at,
+        fromCache: true,
+      },
+    };
+  }
 
+  // Cache miss
+  await saveThreadMessage(threadId, "user", message);
+
+  const history = await getRecentMessages(threadId, 20);
   const aiMessages: ChatMessage[] = buildSystemMessages(
     history.map((m) => ({
-      role: m.role.toLowerCase() as "user" | "assistant",
+      role: m.role as "user" | "assistant",
       content: m.content,
     })),
   );
 
   const result = await chat(aiMessages, model);
-
-  // Sanitize AI response before saving
   const cleanedContent = sanitizeResponse(result.content);
+  const structured = parseStructuredData(cleanedContent);
 
-  // Save assistant response
-  const assistantMessage = await prisma.message.create({
-    data: {
-      conversationId: convoId,
-      role: "ASSISTANT",
-      content: cleanedContent,
-      durationMs: result.totalDuration, // already ms from ai-client
-      tokenCount: result.evalCount,
-    },
-  });
+  // Save to cache and conversation
+  const category = detectCategory(message);
+  await storeInCache(message, cleanedContent, structured, category).catch(
+    () => {},
+  );
+
+  const saved = await saveThreadMessage(
+    threadId,
+    "assistant",
+    cleanedContent,
+    structured,
+    result.evalCount,
+    result.totalDuration,
+  );
+
+  const latency = Date.now() - startTime;
+  await logQueryEvent(getQuestionHash(message), false, latency, category).catch(
+    () => {},
+  );
 
   return {
-    conversationId: convoId,
+    conversationId: threadId,
     message: {
-      id: assistantMessage.id,
+      id: saved.id,
       role: "assistant" as const,
       content: cleanedContent,
-      createdAt: assistantMessage.createdAt.toISOString(),
+      structuredData: structured,
+      createdAt: saved.created_at,
+      fromCache: false,
     },
   };
 }
 
 /**
- * Save the final streamed assistant message to DB (sanitized).
+ * Save the final streamed assistant message + cache it.
  */
 export async function saveAssistantMessage(
   conversationId: string,
   content: string,
   durationMs?: number,
   tokenCount?: number,
+  originalQuestion?: string,
 ) {
   const cleanedContent = sanitizeResponse(content);
-  return prisma.message.create({
-    data: {
-      conversationId,
-      role: "ASSISTANT",
-      content: cleanedContent,
-      durationMs,
-      tokenCount,
-    },
-  });
+  const structured = parseStructuredData(cleanedContent);
+
+  // Save to split-schema conversation
+  const saved = await saveThreadMessage(
+    conversationId,
+    "assistant",
+    cleanedContent,
+    structured,
+    tokenCount,
+    durationMs,
+  );
+
+  // Cache the response for future hits
+  if (originalQuestion) {
+    const category = detectCategory(originalQuestion);
+    await storeInCache(
+      originalQuestion,
+      cleanedContent,
+      structured,
+      category,
+    ).catch(() => {});
+
+    const latency = durationMs ?? 0;
+    await logQueryEvent(
+      getQuestionHash(originalQuestion),
+      false,
+      latency,
+      category,
+    ).catch(() => {});
+  }
+
+  return saved;
 }
 
 /**
- * Get a conversation with all its messages.
+ * Get a conversation thread with all messages.
  */
 export async function getConversation(conversationId: string) {
-  return prisma.conversation.findUnique({
-    where: { id: conversationId },
-    include: {
-      messages: {
-        orderBy: { createdAt: "asc" },
-        select: {
-          id: true,
-          role: true,
-          content: true,
-          tokenCount: true,
-          durationMs: true,
-          createdAt: true,
-        },
-      },
-    },
-  });
+  const thread = await getThread(conversationId);
+  if (!thread) return null;
+
+  const messages = await getThreadMessages(conversationId);
+  return {
+    id: thread.id,
+    title: thread.title,
+    model: thread.model,
+    createdAt: thread.created_at,
+    updatedAt: thread.updated_at,
+    messages: messages.map((m) => ({
+      id: m.id,
+      role: m.role,
+      content: m.content,
+      structuredData: m.structured_data,
+      tokensUsed: m.tokens_used,
+      durationMs: m.duration_ms,
+      createdAt: m.created_at,
+    })),
+  };
 }
 
 /**
- * List conversations for a session.
+ * List conversations for a session, grouped by date.
  */
 export async function listConversations(
   sessionId: string,
   page: number,
   limit: number,
 ) {
-  const skip = (page - 1) * limit;
-  const [conversations, total] = await Promise.all([
-    prisma.conversation.findMany({
-      where: { sessionId },
-      orderBy: { updatedAt: "desc" },
-      skip,
-      take: limit,
-      select: {
-        id: true,
-        title: true,
-        model: true,
-        createdAt: true,
-        updatedAt: true,
-        _count: { select: { messages: true } },
-      },
-    }),
-    prisma.conversation.count({ where: { sessionId } }),
-  ]);
+  const grouped = await listConversationThreads(sessionId);
+
+  // Flatten for pagination
+  const all = [
+    ...grouped.today,
+    ...grouped.yesterday,
+    ...grouped.last7Days,
+    ...grouped.older,
+  ];
+  const total = all.length;
+  const start = (page - 1) * limit;
+  const paginated = all.slice(start, start + limit);
 
   return {
-    conversations,
+    conversations: paginated.map((t) => ({
+      id: t.id,
+      title: t.title,
+      model: t.model,
+      createdAt: t.created_at,
+      updatedAt: t.updated_at,
+      _count: { messages: Number(t.message_count ?? 0) },
+    })),
+    grouped,
     pagination: {
       page,
       limit,
@@ -270,10 +365,9 @@ export async function listConversations(
 }
 
 /**
- * Delete a conversation and its messages (cascading).
+ * Delete a conversation.
  */
 export async function deleteConversation(conversationId: string) {
-  return prisma.conversation.delete({
-    where: { id: conversationId },
-  });
+  await deleteThread(conversationId);
+  return { deleted: true };
 }

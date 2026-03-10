@@ -39,7 +39,7 @@ export function HeroSection() {
         loop
         muted
         playsInline
-        className="absolute inset-0 h-full w-full object-cover opacity-20"
+        className="absolute inset-0 h-full w-full object-cover opacity-40"
         aria-hidden="true"
       >
         <source src="/kenya flag.mp4" type="video/mp4" />

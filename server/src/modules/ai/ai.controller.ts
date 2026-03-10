@@ -17,6 +17,7 @@ import {
   deleteConversation,
 } from "./ai.service.js";
 import { checkAIHealth } from "../../lib/ai-client.js";
+import { getTrendingQuestions } from "../cache/index.js";
 import type { AppError } from "../../middlewares/error.js";
 
 /**
@@ -42,11 +43,9 @@ export async function chatHandler(
     const input = parsed.data;
 
     if (input.stream) {
-      // Prepare DB & stream generator BEFORE sending SSE headers
-      // so that DB errors return a proper HTTP error.
-      const { conversationId, stream } = await handleChatStream(input);
+      const { conversationId, stream, fromCache, structuredData } =
+        await handleChatStream(input);
 
-      // Now switch to SSE mode
       res.writeHead(200, {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
@@ -54,10 +53,34 @@ export async function chatHandler(
         "X-Accel-Buffering": "no",
       });
 
-      // Send conversation ID first
       res.write(
-        `data: ${JSON.stringify({ type: "meta", conversationId })}\n\n`,
+        `data: ${JSON.stringify({ type: "meta", conversationId, fromCache: !!fromCache })}\n\n`,
       );
+
+      if (fromCache) {
+        // Cached response — send as single chunk
+        for await (const chunk of stream) {
+          res.write(
+            `data: ${JSON.stringify({
+              type: "chunk",
+              content: chunk.content,
+              done: true,
+              fromCache: true,
+              structuredData,
+            })}\n\n`,
+          );
+          res.write(
+            `data: ${JSON.stringify({
+              type: "done",
+              conversationId,
+              fromCache: true,
+              structuredData,
+            })}\n\n`,
+          );
+        }
+        res.end();
+        return;
+      }
 
       let fullContent = "";
       let lastDuration: number | undefined;
@@ -66,10 +89,10 @@ export async function chatHandler(
       for await (const chunk of stream) {
         fullContent += chunk.content;
 
-        if (chunk.totalDuration) {
-          lastDuration = chunk.totalDuration; // already in ms from ai-client
+        if ("totalDuration" in chunk && chunk.totalDuration) {
+          lastDuration = chunk.totalDuration;
         }
-        if (chunk.evalCount) {
+        if ("evalCount" in chunk && chunk.evalCount) {
           lastTokenCount = chunk.evalCount;
         }
 
@@ -82,12 +105,12 @@ export async function chatHandler(
         );
 
         if (chunk.done) {
-          // Save complete assistant message
           const saved = await saveAssistantMessage(
             conversationId,
             fullContent,
             lastDuration,
             lastTokenCount,
+            input.message,
           );
 
           res.write(
@@ -241,5 +264,89 @@ export async function aiHealthHandler(
     });
   } catch (err) {
     next(err);
+  }
+}
+
+/**
+ * GET /api/ai/trending
+ * Get trending questions from the cache.
+ */
+export async function trendingQuestionsHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const limit = Math.min(
+      Math.max(parseInt(req.query.limit as string) || 5, 1),
+      20,
+    );
+    const questions = await getTrendingQuestions(limit);
+
+    // Fallback to default if DB has no data yet
+    const defaults = [
+      {
+        question_text: "How do I apply for a National ID card in Kenya?",
+        hit_count: 0,
+        category: "national_id",
+      },
+      {
+        question_text: "How do I register for a KRA PIN on iTax?",
+        hit_count: 0,
+        category: "kra_pin",
+      },
+      {
+        question_text: "What documents do I need for a Kenyan e-Passport?",
+        hit_count: 0,
+        category: "passport",
+      },
+      {
+        question_text: "How do I apply for a HELB student loan?",
+        hit_count: 0,
+        category: "helb",
+      },
+      {
+        question_text: "How do I register for SHA (formerly NHIF)?",
+        hit_count: 0,
+        category: "nhif_sha",
+      },
+    ];
+
+    res.status(200).json({
+      success: true,
+      data: questions.length > 0 ? questions : defaults,
+    });
+  } catch (err) {
+    // On error, return defaults silently
+    res.status(200).json({
+      success: true,
+      data: [
+        {
+          question_text: "How do I apply for a National ID card in Kenya?",
+          hit_count: 0,
+          category: "national_id",
+        },
+        {
+          question_text: "How do I register for a KRA PIN on iTax?",
+          hit_count: 0,
+          category: "kra_pin",
+        },
+        {
+          question_text: "What documents do I need for a Kenyan e-Passport?",
+          hit_count: 0,
+          category: "passport",
+        },
+        {
+          question_text: "How do I apply for a HELB student loan?",
+          hit_count: 0,
+          category: "helb",
+        },
+        {
+          question_text: "How do I register for SHA (formerly NHIF)?",
+          hit_count: 0,
+          category: "nhif_sha",
+        },
+      ],
+    });
   }
 }

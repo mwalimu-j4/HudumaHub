@@ -1,8 +1,19 @@
-// Chat Input Component — Message input with send button
-import { useState, useRef, useCallback, type KeyboardEvent } from "react";
+// Chat Input Component — Premium bottom bar with animated placeholder
+import {
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+  type KeyboardEvent,
+} from "react";
 import { SendHorizontal, Square } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+
+const PLACEHOLDER_QUESTIONS = [
+  "How do I get a National ID?",
+  "What's the process for a KRA PIN?",
+  "How do I apply for a passport?",
+  "How to register for SHA?",
+];
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -18,14 +29,29 @@ export function ChatInput({
   disabled,
 }: ChatInputProps) {
   const [value, setValue] = useState("");
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const [placeholderVisible, setPlaceholderVisible] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Cycle through placeholder questions
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPlaceholderVisible(false);
+      setTimeout(() => {
+        setPlaceholderIndex(
+          (prev) => (prev + 1) % PLACEHOLDER_QUESTIONS.length,
+        );
+        setPlaceholderVisible(true);
+      }, 300);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSend = useCallback(() => {
     const trimmed = value.trim();
     if (!trimmed || isLoading) return;
     onSend(trimmed);
     setValue("");
-    // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
@@ -50,42 +76,74 @@ export function ChatInput({
   }, []);
 
   return (
-    <div className="border-t border-border bg-background p-4">
+    <div
+      className="border-t border-[rgba(255,255,255,0.06)] bg-[#0a0f0a]/95 backdrop-blur-sm px-4 py-3"
+      style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}
+    >
       <div className="mx-auto flex max-w-3xl items-end gap-2">
-        <Textarea
-          ref={textareaRef}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onInput={handleInput}
-          placeholder="Ask about Kenyan government services..."
-          disabled={disabled}
-          className="min-h-[44px] max-h-[200px] resize-none rounded-xl border-border bg-muted/50 px-4 py-3 text-sm focus-visible:ring-primary"
-          rows={1}
-        />
+        <div className="relative flex-1">
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onInput={handleInput}
+            disabled={disabled}
+            className="
+              w-full min-h-[56px] max-h-[200px] resize-none rounded-2xl
+              bg-[rgba(255,255,255,0.05)] border border-[rgba(16,185,129,0.3)]
+              px-4 py-4 pr-12 text-sm text-white placeholder-transparent
+              focus:outline-none focus:border-emerald-500/50 focus:shadow-[0_0_0_2px_rgba(16,185,129,0.4)]
+              transition-all duration-200
+            "
+            rows={1}
+          />
+          {/* Animated placeholder overlay */}
+          {!value && (
+            <span
+              className={`
+                absolute left-4 top-4 text-sm text-[#6b7280] pointer-events-none
+                transition-opacity duration-300
+                ${placeholderVisible ? "opacity-100" : "opacity-0"}
+              `}
+            >
+              {PLACEHOLDER_QUESTIONS[placeholderIndex]}
+            </span>
+          )}
+        </div>
         {isLoading ? (
-          <Button
+          <button
             onClick={onStop}
-            variant="destructive"
-            size="icon"
-            className="h-[44px] w-[44px] shrink-0 rounded-xl"
+            className="
+              h-[56px] w-[56px] shrink-0 rounded-2xl
+              bg-red-500/80 hover:bg-red-500 text-white
+              flex items-center justify-center
+              transition-colors duration-150
+              cursor-pointer
+            "
             title="Stop generating"
           >
             <Square className="h-4 w-4" />
-          </Button>
+          </button>
         ) : (
-          <Button
+          <button
             onClick={handleSend}
             disabled={!value.trim() || disabled}
-            size="icon"
-            className="h-[44px] w-[44px] shrink-0 rounded-xl"
+            className="
+              h-[56px] w-[56px] shrink-0 rounded-2xl
+              bg-emerald-500 hover:bg-emerald-400 hover:scale-105 text-white
+              flex items-center justify-center
+              transition-all duration-150
+              disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100
+              cursor-pointer
+            "
             title="Send message"
           >
             <SendHorizontal className="h-4 w-4" />
-          </Button>
+          </button>
         )}
       </div>
-      <p className="mx-auto mt-2 max-w-3xl text-center text-xs text-muted-foreground">
+      <p className="mx-auto mt-2 max-w-3xl text-center text-[10px] text-[#6b7280]">
         HudumaHub AI may make mistakes. Always verify with official government
         sources.
       </p>

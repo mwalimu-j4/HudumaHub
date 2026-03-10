@@ -12,6 +12,7 @@ export function Layout({ children }: LayoutProps) {
   const isDashboard = useMatch({ from: "/dashboard", shouldThrow: false });
   const isLogin = useMatch({ from: "/login", shouldThrow: false });
   const hideFooter = isChatPage || isDashboard || isLogin;
+  const hideNavbar = !!isChatPage;
 
   // Chat page needs a fixed viewport (no body scroll, internal scroll only)
   const isFixedViewport = !!isChatPage;
@@ -24,7 +25,7 @@ export function Layout({ children }: LayoutProps) {
           : "flex min-h-svh flex-col"
       }
     >
-      <Navbar />
+      {!hideNavbar && <Navbar />}
       <main
         className={
           isFixedViewport

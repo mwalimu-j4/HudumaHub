@@ -7,6 +7,7 @@ import type {
   ConversationListResponse,
   Conversation,
   AIHealthStatus,
+  TrendingQuestion,
 } from "./types";
 
 // Default to production Render URL. Override locally via VITE_API_URL in .env
@@ -186,4 +187,23 @@ export async function checkAIHealth(): Promise<AIHealthStatus> {
     data: AIHealthStatus;
   };
   return json.data;
+}
+
+/**
+ * Fetch trending questions.
+ */
+export async function fetchTrendingQuestions(
+  limit = 5,
+): Promise<TrendingQuestion[]> {
+  try {
+    const response = await fetch(`${API_BASE}/ai/trending?limit=${limit}`);
+    if (!response.ok) return [];
+    const json = (await response.json()) as {
+      success: boolean;
+      data: TrendingQuestion[];
+    };
+    return json.data ?? [];
+  } catch {
+    return [];
+  }
 }

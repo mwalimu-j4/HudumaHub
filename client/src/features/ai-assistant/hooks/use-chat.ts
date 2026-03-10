@@ -31,6 +31,7 @@ interface UseChatReturn {
   stopGenerating: () => void;
   clearChat: () => void;
   setConversationId: (id: string | null) => void;
+  loadMessages: (msgs: ChatMessage[]) => void;
 }
 
 export function useChat(options?: UseChatOptions): UseChatReturn {
@@ -112,6 +113,8 @@ export function useChat(options?: UseChatOptions): UseChatReturn {
                     ...lastMsg,
                     id: data.messageId ?? lastMsg.id,
                     isStreaming: false,
+                    fromCache: data.fromCache,
+                    structuredData: data.structuredData,
                   };
                 }
                 return updated;
@@ -186,6 +189,11 @@ export function useChat(options?: UseChatOptions): UseChatReturn {
     setError(null);
   }, []);
 
+  const loadMessages = useCallback((msgs: ChatMessage[]) => {
+    setMessages(msgs);
+    setError(null);
+  }, []);
+
   return {
     messages,
     conversationId,
@@ -196,5 +204,6 @@ export function useChat(options?: UseChatOptions): UseChatReturn {
     stopGenerating,
     clearChat,
     setConversationId,
+    loadMessages,
   };
 }

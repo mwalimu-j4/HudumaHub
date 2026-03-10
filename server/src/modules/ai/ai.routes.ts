@@ -7,12 +7,16 @@ import {
   listConversationsHandler,
   deleteConversationHandler,
   aiHealthHandler,
+  trendingQuestionsHandler,
 } from "./ai.controller.js";
 
 const aiRouter: IRouter = Router();
 
 // AI Health check
 aiRouter.get("/health", aiHealthHandler);
+
+// Trending questions
+aiRouter.get("/trending", trendingQuestionsHandler);
 
 // Chat endpoint (streaming SSE or JSON)
 aiRouter.post("/chat", chatHandler);
